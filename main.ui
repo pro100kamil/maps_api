@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>670</width>
-    <height>530</height>
+    <height>600</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -40,13 +40,13 @@
    <string notr="true"/>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>10</y>
       <width>652</width>
-      <height>546</height>
+      <height>555</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -117,6 +117,19 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="pushButton">
+         <property name="minimumSize">
+          <size>
+           <width>160</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Сброс</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>
@@ -146,6 +159,20 @@
      </item>
     </layout>
    </widget>
+  </widget>
+  <widget class="QStatusBar" name="status">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>0</width>
+     <height>50</height>
+    </size>
+   </property>
   </widget>
  </widget>
  <resources/>

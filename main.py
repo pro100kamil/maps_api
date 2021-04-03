@@ -63,10 +63,14 @@ class Window(QMainWindow):
             print(f"Ошибка выполнения запроса: {response.status_code} "
                   f"({response.reason})")
             sys.exit(1)
+
         return response.content
 
     def search_toponym(self) -> None:
         """Поиск топонима по нажатию кнопки поиска"""
+
+        self.show_message()
+
         geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
 
         geocoder_params = {
@@ -77,18 +81,21 @@ class Window(QMainWindow):
 
         response = requests.get(geocoder_api_server, params=geocoder_params)
         if not response:
-            print(f"Ошибка выполнения запроса: {response.status_code} "
-                  f"({response.reason})")
-            sys.exit(1)
+            self.show_message(msg='Ошибка запроса!', style='color: white; background-color: red; font-size: 20pt;')
+            return
+
         variants = response.json()["response"]["GeoObjectCollection"][
             "featureMember"]
+
         if not variants:
-            print('Ничего не найдено')
+            self.show_message(msg='Ничего не найдено!', style='color: white; background-color: red; font-size: 20pt;')
             return
+
         toponym = variants[0]
         self.lon, self.lat = tuple(
             map(float, toponym["GeoObject"]["Point"]["pos"].split()))
         self.pt = f"{self.lon},{self.lat},pm2rdl"
+
         self.update_pixmap()
 
     def update_pixmap(self) -> None:
@@ -125,7 +132,12 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         """При закрытии формы удаляем файл с картой"""
+
         os.remove(self.map_file)
+
+    def show_message(self, msg='', style=''):
+        self.statusBar().showMessage(msg)
+        self.statusBar().setStyleSheet(style)
 
 
 def except_hook(cls, exception, traceback):

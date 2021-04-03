@@ -65,8 +65,9 @@ class Window(QMainWindow):
 
     def update_pixmap(self) -> None:
         """Обновляет изображение (карту)"""
-        with open('temp/map.png', 'wb') as file:
-            file.write(self.get_image())
+
+        image = Image.open(BytesIO(self.get_image()))
+        image.save('temp/map.png')
         self.pixmap = QPixmap('temp/map.png')
         self.image.setPixmap(self.pixmap)
 

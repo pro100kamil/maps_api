@@ -72,16 +72,16 @@ class Window(QMainWindow):
 
     def keyPressEvent(self, event):
         # изменение масштаба
-        if event.key() == Qt.Key_Plus:
+        if event.key() == Qt.Key_PageUp:
             self.scale = min(self.scale + 1, 17)
 
-        elif event.key() == Qt.Key_Minus:
+        elif event.key() == Qt.Key_PageDown:
             self.scale = max(self.scale - 1, 0)
 
-        elif event.key() == Qt.Key_PageUp:
+        elif event.key() == Qt.Key_Up:
             delta = 360 / (2 ** self.scale) * HEIGHT / 256
             self.lat = min(90 - delta / 2, self.lat + delta)
-        elif event.key() == Qt.Key_PageDown:
+        elif event.key() == Qt.Key_Down:
             delta = 360 / (2 ** self.scale) * HEIGHT / 256
             self.lat = max(-90, self.lat - delta)
         elif event.key() == Qt.Key_Left:

@@ -6,40 +6,41 @@ from PIL import Image
 
 import requests
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.uic import loadUi
 
-WIDTH, HEIGHT = SCREEN_SIZE = 600, 450
-
-
-def except_hook(cls, exception, traceback):
-    sys.__excepthook__(cls, exception, traceback)
+WIDTH, HEIGHT = MAP_SIZE = 600, 450
 
 
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
+
         loadUi('main.ui', self)
-        self.lon, self.lat = 37.530887, 55.703118
+
+        self.lon, self.lat = 37.530887, 55.703118  # долгота и широта
         self.scale = 17  # текущий масштаб
-        self.map_type = 'map'
-        self.setGeometry(100, 100, *SCREEN_SIZE)
-        self.setWindowTitle('Отображение карты')
+        self.map_type = 'map'  # тип карты
+        self.pt = None  # текущая метка
+
+        self.map_file = "map.png"  # файл с картой
+
         self.pixmap = None
 
         self.types_of_map.buttonToggled.connect(self.get_type_of_map)
+        self.search_btn.clicked.connect(self.search_toponym)
 
         self.update_pixmap()
 
     def get_type_of_map(self, button):
-        """Получение нужного типа карты"""
+        """Получение типа карты"""
 
-        types = {-2: 'sat', -3: 'map', -4: 'sat,skl'}  # Id кнопок в группе кнопок, текст кнопок
+        types = {-2: 'sat', -3: 'map',
+                 -4: 'sat,skl'}  # Id кнопок в группе кнопок, текст кнопок
         # нежелательно использовать, так как его в дизайнере могут изменить
 
         if button.isChecked():
-            print(button.text())
             self.map_type = types[self.types_of_map.id(button)]
 
             self.update_pixmap()
@@ -51,39 +52,66 @@ class Window(QMainWindow):
             "ll": f"{self.lon},{self.lat}",
             "z": self.scale,
             "size": "650,450",
+            "pt": self.pt,
             "l": self.map_type
         }
 
         map_api_server = "http://static-maps.yandex.ru/1.x/"
         response = requests.get(map_api_server, params=map_params)
-        print(response.url)
+
         if not response:
             print(f"Ошибка выполнения запроса: {response.status_code} "
                   f"({response.reason})")
             sys.exit(1)
         return response.content
 
+    def search_toponym(self) -> None:
+        """Поиск топонима по нажатию кнопки поиска"""
+        geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+
+        geocoder_params = {
+            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+            "geocode": self.input_toponym.text(),
+            "format": "json"
+        }
+
+        response = requests.get(geocoder_api_server, params=geocoder_params)
+        if not response:
+            print(f"Ошибка выполнения запроса: {response.status_code} "
+                  f"({response.reason})")
+            sys.exit(1)
+        variants = response.json()["response"]["GeoObjectCollection"][
+            "featureMember"]
+        if not variants:
+            print('Ничего не найдено')
+            return
+        toponym = variants[0]
+        self.lon, self.lat = tuple(
+            map(float, toponym["GeoObject"]["Point"]["pos"].split()))
+        self.pt = f"{self.lon},{self.lat},pm2rdl"
+        self.update_pixmap()
+
     def update_pixmap(self) -> None:
         """Обновляет изображение (карту)"""
 
         image = Image.open(BytesIO(self.get_image()))
-        image.save('temp/map.png')
-        self.pixmap = QPixmap('temp/map.png')
+        image.save(self.map_file)
+        self.pixmap = QPixmap(self.map_file)
         self.image.setPixmap(self.pixmap)
+        self.image.setFocus()
 
     def keyPressEvent(self, event):
         # изменение масштаба
         if event.key() == Qt.Key_PageUp:
             self.scale = min(self.scale + 1, 17)
-
         elif event.key() == Qt.Key_PageDown:
             self.scale = max(self.scale - 1, 0)
-
+        # перемещение центра карты
         elif event.key() == Qt.Key_Up:
-            delta = 360 / (2 ** self.scale) * HEIGHT / 256
+            delta = 180 / (2 ** self.scale) * HEIGHT / 256
             self.lat = min(90 - delta / 2, self.lat + delta)
         elif event.key() == Qt.Key_Down:
-            delta = 360 / (2 ** self.scale) * HEIGHT / 256
+            delta = 180 / (2 ** self.scale) * HEIGHT / 256
             self.lat = max(-90, self.lat - delta)
         elif event.key() == Qt.Key_Left:
             delta = 360 / (2 ** self.scale) * WIDTH / 256
@@ -91,12 +119,22 @@ class Window(QMainWindow):
         elif event.key() == Qt.Key_Right:
             delta = 360 / (2 ** self.scale) * WIDTH / 256
             self.lon = min(180, self.lon + delta)
+        else:
+            return
         self.update_pixmap()
+
+    def closeEvent(self, event):
+        """При закрытии формы удаляем файл с картой"""
+        os.remove(self.map_file)
+
+
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
 
 
 if __name__ == '__main__':
+    sys.excepthook = except_hook
     app = QApplication(sys.argv)
     wind = Window()
     wind.show()
-    sys.excepthook = except_hook
     sys.exit(app.exec())

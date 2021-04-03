@@ -33,10 +33,7 @@ class Window(QMainWindow):
         self.update_pixmap()
 
     def get_type_of_map(self, button):
-        """Получение нужного типа карты"""
-
-        types = {-2: 'sat', -3: 'map', -4: 'sat,skl'}  # Id кнопок в группе кнопок, текст кнопок
-        # нежелательно использовать, так как его в дизайнере могут изменить
+        types = {-2: 'sat', -3: 'map', -4: 'sat,skl'}
 
         if button.isChecked():
             print(button.text())
@@ -56,7 +53,7 @@ class Window(QMainWindow):
 
         map_api_server = "http://static-maps.yandex.ru/1.x/"
         response = requests.get(map_api_server, params=map_params)
-        print(response.url)
+
         if not response:
             print(f"Ошибка выполнения запроса: {response.status_code} "
                   f"({response.reason})")
@@ -65,31 +62,34 @@ class Window(QMainWindow):
 
     def update_pixmap(self) -> None:
         """Обновляет изображение (карту)"""
-        with open('temp/map.png', 'wb') as file:
-            file.write(self.get_image())
-        self.pixmap = QPixmap('temp/map.png')
+        self.pixmap = QPixmap.fromImage(QImage.fromData(self.get_image()))
         self.image.setPixmap(self.pixmap)
 
     def keyPressEvent(self, event):
         # изменение масштаба
         if event.key() == Qt.Key_Plus:
+            print(self.scale)
             self.scale = min(self.scale + 1, 17)
 
         elif event.key() == Qt.Key_Minus:
             self.scale = max(self.scale - 1, 0)
 
-        elif event.key() == Qt.Key_PageUp:
-            delta = 360 / (2 ** self.scale) * HEIGHT / 256
-            self.lat = min(90 - delta / 2, self.lat + delta)
-        elif event.key() == Qt.Key_PageDown:
-            delta = 360 / (2 ** self.scale) * HEIGHT / 256
-            self.lat = max(-90, self.lat - delta)
+        # Когда зум 17, то 1 градус широты равнялся 1206 пикселям. С уменьшением зума на 1,
+        # уменьшалось это расстояния в пикселях на 1.104, но
+        # Проблема в том, что оно уменьшается так до определенного момента,
+        # с какого-то значения зума оно растет в геом прогрессиии
+        elif event.key() == Qt.Key_Up:
+            delta = 360 / (2 ** self.scale) * HEIGHT
+            self.lat = min(85, self.lat + delta)
+        elif event.key() == Qt.Key_Down:
+            delta = (1 / 1206.943) * (1.104 ** (17 - self.scale)) * HEIGHT
+            # Края карты определяются разным зумом, и они всегда разные, я пока взял константой -85
+            self.lat = max(-85, self.lat - delta)
         elif event.key() == Qt.Key_Left:
-            delta = 360 / (2 ** self.scale) * WIDTH / 256
-            self.lon = max(-180, self.lon - delta)
-        elif event.key() == Qt.Key_Right:
-            delta = 360 / (2 ** self.scale) * WIDTH / 256
-            self.lon = min(180, self.lon + delta)
+            # Была формула где 1 градус долготы = 111 км * cos(широты).
+            # Я просто взял 111 км за пиксели и перемножил с косинусом
+            delta = (1 / 1206.943) * (1.104 ** (17 - self.scale)) * WIDTH * cos(radians(self.lat))
+            self.lon = max(-175, self.lon - delta)
         self.update_pixmap()
 
 

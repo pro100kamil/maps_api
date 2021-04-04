@@ -128,23 +128,47 @@ class Window(QMainWindow):
         post_code = toponym['GeoObject']['metaDataProperty'][
             "GeocoderMetaData"]["Address"].get("postal_code")
 
+        msg = self.address + ', индекс ' + post_code \
+            if self.post_code.isChecked() and post_code is not None \
+            else self.address
+        font_size = 8 if len(msg) > 100 else 10 if len(msg) > 80 \
+            else 12 if len(msg) > 60 else 14
         self.show_message(
-            msg=self.address + ', индекс ' + post_code
-            if self.post_code.isChecked() and post_code is not None
-            else self.address,
+            msg=msg,
             style='color: white; background-color: green; '
-                  'font-size: 10pt; text-align: center;')
+                  f'font-size: {font_size}pt;')
 
         self.update_pixmap()
 
     def search_organization(self, coords: str) -> None:
-        """Возращает организацию"""
+        """Ищет организацию"""
+        geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+
+        geocoder_params = {
+            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+            "geocode": coords,
+            "format": "json",
+        }
+
+        response = requests.get(geocoder_api_server, params=geocoder_params)
+        if not response:
+            return
+
+        variants = response.json()["response"]["GeoObjectCollection"][
+            "featureMember"]
+
+        if not variants:
+            return
+
+        address = variants[0]['GeoObject']['metaDataProperty'][
+            'GeocoderMetaData']['text']
+
         search_api_server = "https://search-maps.yandex.ru/v1/"
 
         search_params = {
             "apikey": "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3",
             "lang": "ru_RU",
-            "text": "магазин",
+            "text": address,
             "ll": coords,
             "type": "biz"
         }
@@ -162,11 +186,12 @@ class Window(QMainWindow):
 
         if lonlat_distance(coords, coords_org) <= 50:
             name = org["properties"]["CompanyMetaData"]["name"]
+            print(name, address)
             self.pt = coords_org + ',pm2rdl'
             self.show_message(
                 msg=name,
                 style='color: white; background-color: green; '
-                      'font-size: 10pt; text-align: center;')
+                      'font-size: 10pt;')
             self.update_pixmap()
         else:
             print('Близкой организации не найдено')
@@ -245,12 +270,7 @@ class Window(QMainWindow):
         os.remove(self.map_file)
 
 
-def except_hook(cls, exception, traceback):
-    sys.__excepthook__(cls, exception, traceback)
-
-
 if __name__ == '__main__':
-    sys.excepthook = except_hook
     app = QApplication(sys.argv)
     wind = Window()
     wind.show()

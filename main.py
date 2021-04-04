@@ -1,7 +1,6 @@
 import os
 import sys
 from io import BytesIO
-from math import cos, radians
 from PIL import Image
 
 import requests
@@ -20,16 +19,18 @@ class Window(QMainWindow):
         loadUi('main.ui', self)
 
         self.lon, self.lat = 37.530887, 55.703118  # долгота и широта
-        self.scale = 17  # текущий масштаб
+        self.scale = 14  # текущий масштаб
         self.map_type = 'map'  # тип карты
         self.pt = None  # текущая метка
 
         self.map_file = "map.png"  # файл с картой
 
         self.pixmap = None
+        self.address = None
 
         self.types_of_map.buttonToggled.connect(self.get_type_of_map)
         self.search_btn.clicked.connect(self.search_toponym)
+        self.reset_btn.clicked.connect(self.reset_search)
 
         self.update_pixmap()
 
@@ -81,20 +82,28 @@ class Window(QMainWindow):
 
         response = requests.get(geocoder_api_server, params=geocoder_params)
         if not response:
-            self.show_message(msg='Ошибка запроса!', style='color: white; background-color: red; font-size: 20pt;')
+            self.reset_search()
+            self.show_message(msg='Ошибка запроса!',
+                              style='color: white; background-color: red; font-size: 20pt;')
             return
 
-        variants = response.json()["response"]["GeoObjectCollection"][
-            "featureMember"]
+        variants = response.json()["response"]["GeoObjectCollection"]["featureMember"]
 
         if not variants:
-            self.show_message(msg='Ничего не найдено!', style='color: white; background-color: red; font-size: 20pt;')
+            self.reset_search()
+            self.show_message(msg='Ничего не найдено!',
+                              style='color: white; background-color: red; font-size: 20pt;')
             return
 
         toponym = variants[0]
+
         self.lon, self.lat = tuple(
             map(float, toponym["GeoObject"]["Point"]["pos"].split()))
         self.pt = f"{self.lon},{self.lat},pm2rdl"
+        self.address = toponym['GeoObject']['metaDataProperty']['GeocoderMetaData']['text']
+
+        self.show_message(msg=self.address,
+                          style='color: white; background-color: green; font-size: 11pt;')
 
         self.update_pixmap()
 
@@ -136,8 +145,17 @@ class Window(QMainWindow):
         os.remove(self.map_file)
 
     def show_message(self, msg='', style=''):
+        """Уведомление об ошибках или успешном поиске в статус-меню"""
+
         self.statusBar().showMessage(msg)
         self.statusBar().setStyleSheet(style)
+
+    def reset_search(self):
+        """Сброс поиска"""
+
+        self.pt, self.address = '', ''
+        self.show_message()
+        self.update_pixmap()
 
 
 def except_hook(cls, exception, traceback):

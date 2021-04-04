@@ -23,13 +23,13 @@ class Window(QMainWindow):
         self.map_type = 'map'  # тип карты
         self.pt = None  # текущая метка
         self.address = None
-
+        self.index = None
         self.map_file = "map.png"  # файл с картой
 
         self.pixmap = None
 
         self.types_of_map.buttonToggled.connect(self.get_type_of_map)
-        self.search_btn.clicked.connect(self.search_toponym)
+        self.search_btn.clicked.connect(lambda text: self.search_toponym(geocode=self.input_toponym.text()))
         self.reset_btn.clicked.connect(self.reset_search)
         self.post_code.stateChanged.connect(self.change_state_post_code)
 
@@ -68,15 +68,15 @@ class Window(QMainWindow):
 
         return response.content
 
-    def search_toponym(self) -> None:
+    def search_toponym(self, geocode, mode=1) -> None:
         """Поиск топонима по нажатию кнопки поиска"""
 
         geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
 
         geocoder_params = {
             "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-            "geocode": self.input_toponym.text(),
-            "format": "json"
+            "geocode": geocode,
+            "format": "json",
         }
 
         response = requests.get(geocoder_api_server, params=geocoder_params)
@@ -99,9 +99,10 @@ class Window(QMainWindow):
 
         toponym = variants[0]
 
-        self.lon, self.lat = tuple(
-            map(float, toponym["GeoObject"]["Point"]["pos"].split()))
-        self.pt = f"{self.lon},{self.lat},pm2rdl"
+        if mode:
+            self.lon, self.lat = tuple(
+                map(float, toponym["GeoObject"]["Point"]["pos"].split()))
+            self.pt = f"{self.lon},{self.lat},pm2rdl"
         self.address = toponym['GeoObject']['metaDataProperty'][
             'GeocoderMetaData']['text']
 
@@ -109,11 +110,11 @@ class Window(QMainWindow):
             "GeocoderMetaData"]["Address"].get("postal_code")
 
         self.show_message(
-            msg=self.address + ' ' + post_code
+            msg=self.address + ', индекс ' + post_code
             if self.post_code.isChecked() and post_code is not None
             else self.address,
             style='color: white; background-color: green; '
-                  'font-size: 12pt; text-align: center;')
+                  'font-size: 10pt; text-align: center;')
 
         self.update_pixmap()
 
@@ -128,14 +129,15 @@ class Window(QMainWindow):
 
     def change_state_post_code(self):
         """Обработка нажатия на checkbox"""
+
         if self.address is not None:
-            self.search_toponym()
+            self.search_toponym(self.address, mode=0)
 
     def keyPressEvent(self, event):
         # изменение масштаба
-        if event.key() == Qt.Key_PageUp:
+        if event.key() == Qt.Key_Equal:
             self.scale = min(self.scale + 1, 17)
-        elif event.key() == Qt.Key_PageDown:
+        elif event.key() == Qt.Key_Minus:
             self.scale = max(self.scale - 1, 0)
         # перемещение центра карты
         elif event.key() == Qt.Key_Up:
@@ -153,6 +155,17 @@ class Window(QMainWindow):
         else:
             return
         self.update_pixmap()
+
+    def mousePressEvent(self, event):
+        l_x, l_y = self.image.x(), self.image.y()
+        l_w, l_h = self.image.width(), self.image.height()
+        if l_x <= event.x() <= l_x + self.image.width() and l_y < event.y() < l_y + self.image.height():
+            d_x_px, d_y_px = event.x() - l_x - l_w / 2, -(event.y() - l_y - l_h / 2)
+            d_x_degree = 360 / (2 ** self.scale) * d_x_px / 256
+            d_y_degree = 180 / (2 ** self.scale) * d_y_px / 256
+            coords = f'{self.lon + d_x_degree},{self.lat + d_y_degree}'
+            self.pt = coords + ',pm2rdl'
+            self.search_toponym(geocode=coords, mode=0)
 
     def closeEvent(self, event):
         """При закрытии формы удаляем файл с картой"""

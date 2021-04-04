@@ -22,15 +22,16 @@ class Window(QMainWindow):
         self.scale = 14  # текущий масштаб
         self.map_type = 'map'  # тип карты
         self.pt = None  # текущая метка
+        self.address = None
 
         self.map_file = "map.png"  # файл с картой
 
         self.pixmap = None
-        self.address = None
 
         self.types_of_map.buttonToggled.connect(self.get_type_of_map)
         self.search_btn.clicked.connect(self.search_toponym)
         self.reset_btn.clicked.connect(self.reset_search)
+        self.post_code.stateChanged.connect(self.change_state_post_code)
 
         self.update_pixmap()
 
@@ -70,8 +71,6 @@ class Window(QMainWindow):
     def search_toponym(self) -> None:
         """Поиск топонима по нажатию кнопки поиска"""
 
-        self.show_message()
-
         geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
 
         geocoder_params = {
@@ -84,15 +83,18 @@ class Window(QMainWindow):
         if not response:
             self.reset_search()
             self.show_message(msg='Ошибка запроса!',
-                              style='color: white; background-color: red; font-size: 20pt;')
+                              style='color: white; background-color: red;'
+                                    ' font-size: 20pt;')
             return
 
-        variants = response.json()["response"]["GeoObjectCollection"]["featureMember"]
+        variants = response.json()["response"]["GeoObjectCollection"][
+            "featureMember"]
 
         if not variants:
             self.reset_search()
             self.show_message(msg='Ничего не найдено!',
-                              style='color: white; background-color: red; font-size: 20pt;')
+                              style='color: white; background-color: red; '
+                                    'font-size: 20pt;')
             return
 
         toponym = variants[0]
@@ -100,10 +102,18 @@ class Window(QMainWindow):
         self.lon, self.lat = tuple(
             map(float, toponym["GeoObject"]["Point"]["pos"].split()))
         self.pt = f"{self.lon},{self.lat},pm2rdl"
-        self.address = toponym['GeoObject']['metaDataProperty']['GeocoderMetaData']['text']
+        self.address = toponym['GeoObject']['metaDataProperty'][
+            'GeocoderMetaData']['text']
 
-        self.show_message(msg=self.address,
-                          style='color: white; background-color: green; font-size: 11pt;')
+        post_code = toponym['GeoObject']['metaDataProperty'][
+            "GeocoderMetaData"]["Address"].get("postal_code")
+
+        self.show_message(
+            msg=self.address + ' ' + post_code
+            if self.post_code.isChecked() and post_code is not None
+            else self.address,
+            style='color: white; background-color: green; '
+                  'font-size: 12pt; text-align: center;')
 
         self.update_pixmap()
 
@@ -115,6 +125,11 @@ class Window(QMainWindow):
         self.pixmap = QPixmap(self.map_file)
         self.image.setPixmap(self.pixmap)
         self.image.setFocus()
+
+    def change_state_post_code(self):
+        """Обработка нажатия на checkbox"""
+        if self.address is not None:
+            self.search_toponym()
 
     def keyPressEvent(self, event):
         # изменение масштаба
@@ -144,16 +159,16 @@ class Window(QMainWindow):
 
         os.remove(self.map_file)
 
-    def show_message(self, msg='', style=''):
+    def show_message(self, msg='', style='') -> None:
         """Уведомление об ошибках или успешном поиске в статус-меню"""
 
         self.statusBar().showMessage(msg)
         self.statusBar().setStyleSheet(style)
 
-    def reset_search(self):
+    def reset_search(self) -> None:
         """Сброс поиска"""
 
-        self.pt, self.address = '', ''
+        self.pt, self.address = None, None
         self.show_message()
         self.update_pixmap()
 

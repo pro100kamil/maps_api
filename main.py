@@ -30,6 +30,19 @@ def lonlat_distance(a: str, b: str) -> float:
     return round(math.sqrt(dx * dx + dy * dy), 4)
 
 
+def get_geocoder_response(geocode) -> requests.Response:
+    """Возвращает результат запроса к геокодеру"""
+    geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": geocode,
+        "format": "json",
+    }
+
+    return requests.get(geocoder_api_server, params=geocoder_params)
+
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -87,18 +100,11 @@ class Window(QMainWindow):
 
         return response.content
 
-    def search_toponym(self, geocode: str, change_pt=True) -> None:
+    def search_toponym(self, geocode: str, change_coords=True) -> None:
         """Поиск топонима"""
 
-        geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+        response = get_geocoder_response(geocode)
 
-        geocoder_params = {
-            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-            "geocode": geocode,
-            "format": "json",
-        }
-
-        response = requests.get(geocoder_api_server, params=geocoder_params)
         if not response:
             self.reset_search()
             self.show_message(msg='Ошибка запроса!',
@@ -118,7 +124,7 @@ class Window(QMainWindow):
 
         toponym = variants[0]
 
-        if change_pt:
+        if change_coords:
             self.lon, self.lat = tuple(
                 map(float, toponym["GeoObject"]["Point"]["pos"].split()))
             self.pt = f"{self.lon},{self.lat},pm2rdl"
@@ -142,15 +148,8 @@ class Window(QMainWindow):
 
     def search_organization(self, coords: str) -> None:
         """Ищет организацию"""
-        geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+        response = get_geocoder_response(coords)
 
-        geocoder_params = {
-            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-            "geocode": coords,
-            "format": "json",
-        }
-
-        response = requests.get(geocoder_api_server, params=geocoder_params)
         if not response:
             return
 
@@ -191,7 +190,7 @@ class Window(QMainWindow):
             self.show_message(
                 msg=name,
                 style='color: white; background-color: green; '
-                      'font-size: 10pt;')
+                      'font-size: 16pt;')
             self.update_pixmap()
         else:
             print('Близкой организации не найдено')
@@ -209,13 +208,13 @@ class Window(QMainWindow):
         """Обработка нажатия на checkbox"""
 
         if self.pt is not None:  # если стоит метка
-            self.search_toponym(self.address, change_pt=False)
+            self.search_toponym(self.address, change_coords=False)
 
     def show_message(self, msg='', style='') -> None:
-        """Уведомление об ошибках или успешном поиске в статус-меню"""
+        """Уведомление об ошибках или успешном поиске"""
 
-        self.statusBar().showMessage(msg)
-        self.statusBar().setStyleSheet(style)
+        self.status.setText(msg)
+        self.status.setStyleSheet(style)
 
     def reset_search(self) -> None:
         """Сброс поиска"""
@@ -260,7 +259,7 @@ class Window(QMainWindow):
             coords = f'{self.lon + d_x_degree},{self.lat + d_y_degree}'
             if event.button() == Qt.LeftButton:
                 self.pt = coords + ',pm2rdl'
-                self.search_toponym(geocode=coords, change_pt=False)
+                self.search_toponym(geocode=coords, change_coords=False)
             else:
                 self.search_organization(coords)
 
